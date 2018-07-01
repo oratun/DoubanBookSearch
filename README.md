@@ -1,8 +1,11 @@
 [DoubanBookSearch](http://chromedriver.chromium.org/downloads)
 ======================
-#功能说明
+# 功能说明
 想根据评分指导Python书籍选购，在豆瓣读书上搜索python的结果是无序的，而豆瓣未提供按评分排序的功能，
 于是自己写了爬虫，抓取并缓存搜索结果，对数据适当清洗后根据评分由高到低排序，存入csv文件。
+
+因为豆瓣读书的搜索结果页面是通过Ajax异步加载的，无法通过requests获取到包含图书信息的HTML，
+所以使用Selenium + Chrome的方式渲染js拿到数据。
 
 Python图书评分排行Top10（基于豆瓣读书数据）
 
@@ -19,7 +22,7 @@ Hands-On Machine Learning with Scikit-Learn and TensorFlow : Concepts, Tools, an
 Python Cookbook 中文版，第 3 版 | 9.3	 | 100 | DavidM.Beazley,BrianK.Jones,陈舸,人民邮电出版社,2015-5-1,108.00元
 Python Cookbook | 9.3 | 97 | DavidBeazley,BrianK.Jones,O'ReillyMedia,2013-5-29,USD49.99
 
-#使用说明
+# 使用说明
 运行环境 mac OS 10.14, Python 3.6, Chrome 67, ChromeDriver 2.37
 
 - 安装依赖包 $pip3 install -r requirements.txt
