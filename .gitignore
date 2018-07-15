@@ -95,7 +95,6 @@ $RECYCLE.BIN/
 *.msp
 
 venv/
-books.csv
 data/
 cached/
 .idea/

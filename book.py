@@ -56,11 +56,12 @@ class Book(Model):
     """
 
     def __init__(self):
-        # 名称 评分 打分人数 作者及出版信息 封面图片链接
+        # 名称 评分 打分人数 作者及出版信息 主页链接 封面图片链接
         self.name = ''
         self.score = 0
         self.evaluate = ''
         self.meta = ''
+        self.url = ''
         self.cover_url = ''
 
 
@@ -99,6 +100,10 @@ def cached_url(driver, url):
         # sys.exit()
         with open(path, 'wb') as f:
             f.write(content)
+        # 每次请求网页后随机暂停几秒
+        # 在此处而不是在主程序暂停是为了读缓存时不用等待
+        nap = random.random() * 5
+        time.sleep(nap)
     return content
 
 
@@ -113,8 +118,8 @@ def book_from_div(div):
     b.score = e('.rating_nums').text() or '0'
     b.evaluate = e('.pl').text()
     b.meta = e('.abstract').text()
-    # xmlns这个属性会导致pyquery无法如下解析
-    # b.cover_url = e('img').attr('src')
+    b.url = e('.title-text').attr('href')
+    # xmlns这个属性可能导致pyquery无法如下解析
     b.cover_url = e('.cover').attr('src')
     return b
 
@@ -133,27 +138,93 @@ def books_from_url(url, driver):
         next_page = None
     return books, next_page
 
-def book_to_csv(file_name, books):
-    """ 
-    对数据进行清洗排序, 写入csv
+
+class Save:
     """
-    with open(file_name, 'w') as csvfile:
+    接收list[books object], 可保存为不同版本的csv
+    默认版本 中文版本 有评价版本
+    """
+    def __init__(self, books, file_name='books'):
+        self.books = books
+        self.file_name = file_name
+        self.fieldnames = ['name', 'score', 'evaluate', 'meta', 'url', 'cover_url']
+        self.rows = []
+
+    @staticmethod
+    def has_zh(name):
+        """书名是否含有中文
+        todo 对繁体中文/日文有误判"""
+        for char in name:
+            if u'\u4e00' <= char <= u'\u9fff':
+                return True
+        return False
+
+    def books_to_rows(self):
+        """
+        对数据进行清洗排序, 生成包含所有行的列表
+        """
         # fieldnames = ['name', 'score', 'evaluate', 'price', 'publish_date', 'publish_house', 'authors', 'cover_url']
-        fieldnames = ['name', 'score', 'evaluate', 'meta', 'cover_url']
-        writer = csv.writer(csvfile)
-        writer.writerow(fieldnames)
-        for b in books:
+        for b in self.books:
             name = b.name
             score = b.score or 0
             evaluate = ''.join(filter(str.isdigit, b.evaluate)) or '0'
             meta = ','.join(b.meta.replace(' ', '').split('/'))
             # if len(meta) <= 3: print(meta)
             # price, publish_date, publish_house, authors = meta[-1], meta[-2], meta[-3], ','.join(meta[:-3])
+            url = b.url
             cover_url = b.cover_url
             # row = [name, score, evaluate, price, publish_date, publish_house, authors, cover_url]
-            row = [name, score, evaluate, meta, cover_url]
-            writer.writerow(row)
-        print('成功写入文件: ', file_name)
+            row = [name, score, evaluate, meta, url, cover_url]
+            self.rows.append(row)
+
+    def rows_to_csv(self):
+        """
+        生成包含所有行的csv
+        """
+        # f1 = open(file_name + '_zh.csv')
+        #         # w1 = csv.writer(f1)
+        #         # f2 = open(file_name + '_evl.csv')
+        #         # w2 = csv.writer(f2)
+        file_name = self.file_name + '.csv'
+        with open(file_name, 'w', encoding='UTF-8') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(self.fieldnames)
+            for row in self.rows:
+                writer.writerow(row)
+            print('成功写入文件: ', file_name)
+
+    def rows_to_csv_zh(self):
+        """
+        名称里有中文的书 写入 _zh.csv
+        """
+        file_name = self.file_name + '_zh.csv'
+        with open(file_name, 'w', encoding='UTF-8') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(self.fieldnames)
+            for row in self.rows:
+                name = row[0]
+                if self.has_zh(name):
+                    writer.writerow(row)
+            print('成功写入文件: ', file_name)
+
+    def rows_to_csv_el(self):
+        """评价人数大于0的书 写入 _el.csv"""
+        file_name = self.file_name + '_el.csv'
+        with open(file_name, 'w', encoding='UTF-8') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(self.fieldnames)
+            for row in self.rows:
+                evaluate = row[2]
+                if evaluate.isdigit() and int(evaluate) > 0:
+                    writer.writerow(row)
+            print('成功写入文件: ', file_name)
+
+    def write(self):
+        self.books_to_rows()
+        self.rows_to_csv()
+        self.rows_to_csv_zh()
+        self.rows_to_csv_el()
+
 
 def main(key):
     next_page = '1'
@@ -171,12 +242,12 @@ def main(key):
             driver.close()
             sys.exit()
         all_books.extend(books)
-        print('搜索到如下结果: \n', all_books)
-        nap = random.random() * 5
-        time.sleep(nap)
+        # print('搜索到如下结果: \n', all_books)
         begin += 15
+        # break
     all_books.sort(key=lambda x: float(x.score), reverse=True)
-    book_to_csv('books.csv', all_books)
+    s = Save(all_books)
+    s.write()
 
 
 if __name__ == '__main__':
